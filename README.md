@@ -12,6 +12,7 @@ Furthermore, all syscalls made in an x86 application go through the x64 version 
 ## How it works
 When looking at the allocated memory of a x86 application in Process Hacker, the following can always be seen:
 ![64bitdlls](64bitdlls.png)
+
 Weird. DLL's loaded in 64-bit memory in a x86 application? Why would these be here? 
 
 The answer is WoW64. WoW64 is an emulator/compatability layer which allows the 64-bit operating system to properly run x86 applications, more specifically it allows the x86 application to, for example, use syscalls. The Windows NT kernel except the syscalls to be the 64-bit version, hence whenever an x86 application wants to interact with the kernel, all the arguments for the syscall needs to be translated to the x64-counterpart. 
@@ -19,6 +20,7 @@ The answer is WoW64. WoW64 is an emulator/compatability layer which allows the 6
 ### Heaven's Gate
 Looking at a syscall in the x86 version of `ntdll.dll`:
 ![syscall](syscall.png)
+
 As can be seen here, no normal SYSENTER/interrupt is done here, instead it calls the function `Wow64SystemServiceCall`. Following the execution here with a debugger, it leads to to a special `far jmp` instruction, which also is the instruction that performs the segment switch to x64-mode. This is usually referred to as "Heaven's gate". 
 
 Ok, so this is how we will be able to enter x64-mode. What now?
@@ -33,6 +35,7 @@ The first approach is manually mapping it. If the goal is to sneaky, this defini
 The second approach is using the Windows API to somehow call the `LoadLibrary` function to "organically" load the DLL. For the sake of this proof of concept, this is the method I chose.
 Following a call to `LoadLibrary`, we find ourselves in the function `LoadLibraryExW` in `KernelBase.dll`, where the following code can be seen:
 ![loadlibrary](loadlib.png)
+
 This is good. To actually load the DLL, the function `LdrLoadDll`, imported from `ntdll.dll`, is used. Being a function exported from `ntdll.dll`, this is something we have access to while executing in 64-bit mode without having to perform any manual map.
 
 The current plan is to switch the execution to 64-bit, somehow call `LdrLoadDll` to load our DLL, and eventually switch back the execution to x86. For this, I crafted a piece of shellcode which encodes the following instructions:
